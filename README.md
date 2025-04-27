@@ -4,7 +4,7 @@ A tool to graphicalize polynomials with thier 1st and 2nd derivatives, made with
 
 <br/> There is also
 
-<a href="[url](https://larryzpl123.github.io/Prime-Graphing-Calculator-for-Polynomials/)">a html website version</a>
+<a href="(https://larryzpl123.github.io/Prime-Graphing-Calculator-for-Polynomials/)">a html website version</a>
 
 translated from the java file.
 
