@@ -3,9 +3,7 @@
 A tool to graphicalize polynomials with thier 1st and 2nd derivatives, made with basic java without needing any special libraries to run.<br/>
 
 <br/> There is also
-
-<a href="(https://larryzpl123.github.io/Prime-Graphing-Calculator-for-Polynomials/)">a html website version</a>
-
+<a href="https://larryzpl123.github.io/Prime-Graphing-Calculator-for-Polynomials/">a html website version</a>
 translated from the java file.
 
 <br/>
