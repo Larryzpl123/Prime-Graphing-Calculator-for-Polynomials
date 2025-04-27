@@ -24,7 +24,7 @@ public class Slope_Derivative_Graph_for_Polynomials extends JFrame {
     private GraphPanel graphPanel;
     private JLabel coordinatesLabel;
     private JCheckBox showLabelsCheckBox;
-    private static final Color[] ADDITIONAL_COLORS = {Color.GREEN, Color.ORANGE, Color.MAGENTA, Color.CYAN};
+    private static final Color[] ADDITIONAL_COLORS = {Color.YELLOW, Color.GREEN, Color.BLUE, Color.CYAN, Color.MAGENTA};
     private int nextColorIndex = 0;
     private int additionalFunctionCount = 0;
 
@@ -54,9 +54,9 @@ public class Slope_Derivative_Graph_for_Polynomials extends JFrame {
         JPanel mainPanel = new JPanel(new BorderLayout());
         JLabel equationLabel = new JLabel();
         equationLabel.setText("<html><div style='text-align: left;'>" +
-                ".        Original: <font color='blue'>" + originalEquation + "</font><br/>" +
+                ".        Original: <font color='black'>" + originalEquation + "</font><br/>" +
                 ".        Derivative: <font color='red'>" + derivativeEquation + "</font><br/>" +
-                ".        Second Derivative: <font color='black'>" + secondDerivativeEquation + "</font></div></html>");
+                ".        Second Derivative: <font color='orange'>" + secondDerivativeEquation + "</font></div></html>");
         mainPanel.add(equationLabel, BorderLayout.NORTH);
 
         graphPanel = new GraphPanel(originalTerms, derivativeTerms, secondDerivativeTerms);
@@ -89,6 +89,10 @@ public class Slope_Derivative_Graph_for_Polynomials extends JFrame {
                 double cy = Double.parseDouble(cyField.getText());
                 double zoomLength = Double.parseDouble(zoomLengthField.getText());
                 double zoomWidth = Double.parseDouble(zoomWidthField.getText());
+                if (zoomLength <= 0 || zoomWidth <= 0) {
+                    JOptionPane.showMessageDialog(this, "Zoom length and width must be positive.");
+                    return;
+                }
                 graphPanel.setZoom(cx, cy, zoomLength, zoomWidth);
             } catch (NumberFormatException ex) {
                 JOptionPane.showMessageDialog(this, "Invalid zoom values.");
@@ -283,7 +287,6 @@ public class Slope_Derivative_Graph_for_Polynomials extends JFrame {
         return color;
     }
 
-    // Abstract class for functions y=f(x)
     abstract class GraphFunction {
         Color color;
         String name;
@@ -328,7 +331,6 @@ public class Slope_Derivative_Graph_for_Polynomials extends JFrame {
         }
     }
 
-    // Class for vertical lines x=constant
     class VerticalLine {
         double xValue;
         Color color;
@@ -351,11 +353,12 @@ public class Slope_Derivative_Graph_for_Polynomials extends JFrame {
         private double yMin = -10;
         private double yMax = 10;
         private Double currentX;
+        private GraphFunction closestFunction; // Added to track the closest function
 
         public GraphPanel(List<Term> originalTerms, List<Term> derivativeTerms, List<Term> secondDerivativeTerms) {
-            functions.add(new PolynomialFunction(originalTerms, Color.BLUE, "f(x)"));
+            functions.add(new PolynomialFunction(originalTerms, Color.BLACK, "f(x)"));
             functions.add(new PolynomialFunction(derivativeTerms, Color.RED, "f'(x)"));
-            functions.add(new PolynomialFunction(secondDerivativeTerms, Color.BLACK, "f''(x)"));
+            functions.add(new PolynomialFunction(secondDerivativeTerms, Color.ORANGE, "f''(x)"));
             setPreferredSize(new Dimension(1440, 775));
             setBackground(Color.WHITE);
 
@@ -367,12 +370,38 @@ public class Slope_Derivative_Graph_for_Polynomials extends JFrame {
                     double x = xMin + (mouseXPixels * (xMax - xMin) / (double) getWidth());
                     double y = yMax - (mouseYPixels * (yMax - yMin) / (double) getHeight());
                     currentX = x;
-                    StringBuilder sb = new StringBuilder("x = " + String.format("%.2f", x) + ", y = " + String.format("%.2f", y));
+
+                    // Find the function closest to the mouse's y-position
+                    double minDiff = Double.MAX_VALUE;
+                    GraphFunction closest = null;
+                    double closestY = 0;
                     for (GraphFunction function : functions) {
                         double funcY = function.evaluate(x);
-                        sb.append(", " + function.name + " = " + String.format("%.2f", funcY));
+                        double diff = Math.abs(funcY - y);
+                        if (diff < minDiff) {
+                            minDiff = diff;
+                            closest = function;
+                            closestY = funcY;
+                        }
                     }
-                    Slope_Derivative_Graph_for_Polynomials.this.coordinatesLabel.setText(sb.toString());
+                    closestFunction = closest;
+
+                    // Update the label with x, y, and the closest function's value
+                    if (closest != null) {
+                        String labelText = String.format("x = %.2f, y = %.2f, %s = %.2f", x, y, closest.name, closestY);
+                        Slope_Derivative_Graph_for_Polynomials.this.coordinatesLabel.setText(labelText);
+                    }
+                    repaint();
+                }
+            });
+
+            // Add mouse listener to clear label when mouse exits
+            addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseExited(MouseEvent e) {
+                    currentX = null;
+                    closestFunction = null;
+                    Slope_Derivative_Graph_for_Polynomials.this.coordinatesLabel.setText("Coordinates: ");
                     repaint();
                 }
             });
@@ -420,14 +449,13 @@ public class Slope_Derivative_Graph_for_Polynomials extends JFrame {
                 g.drawLine(xPixel, 0, xPixel, height);
             }
 
-            if (currentX != null) {
-                for (GraphFunction function : functions) {
-                    double y = function.evaluate(currentX);
-                    int xPixel = (int) ((currentX - xMin) * width / (xMax - xMin));
-                    int yPixel = (int) ((yMax - y) * height / (yMax - yMin));
-                    g.setColor(function.color);
-                    g.fillOval(xPixel - 3, yPixel - 3, 6, 6);
-                }
+            // Draw only the point for the closest function
+            if (currentX != null && closestFunction != null) {
+                double y = closestFunction.evaluate(currentX);
+                int xPixel = (int) ((currentX - xMin) * width / (xMax - xMin));
+                int yPixel = (int) ((yMax - y) * height / (yMax - yMin));
+                g.setColor(closestFunction.color);
+                g.fillOval(xPixel - 3, yPixel - 3, 6, 6);
             }
         }
 
