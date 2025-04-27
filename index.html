@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Polynomial Derivatives Graph</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #canvas { border: 1px solid #000; background: white; }
+        .controls { margin: 10px 0; }
+        .control-group { margin: 10px 0; padding: 10px; border: 1px solid #ddd; }
+        label { display: inline-block; width: 120px; }
+        input[type="text"] { width: 200px; }
+    </style>
+</head>
+<body>
+    <div class="control-group">
+        <label>Enter Polynomial:</label>
+        <input type="text" id="polyInput" value="x^3 + x^2 +x +1">
+        <button onclick="parsePolynomial()">Plot</button>
+    </div>
+
+    <div class="control-group">
+        <label>Show Labels:</label>
+        <br/>
+        <input type="checkbox" id="showLabels" checked>
+        
+        <label>Center X:</label>
+        <input type="text" id="cx" value="0" size="5">
+        
+        <label>Center Y:</label>
+        <input type="text" id="cy" value="0" size="5">
+        
+        <label>Zoom Width:</label>
+        <input type="text" id="zoomW" value="20" size="5">
+        
+        <label>Zoom Height:</label>
+        <input type="text" id="zoomH" value="20" size="5">
+        
+        <button onclick="applyZoom()">Apply Zoom</button>
+        
+        <button onclick="addFunction()">Add Function</button>
+    </div>
+    
+    <div id="equations"></div>
+
+    <div id="coordinates">Coordinates: </div>
+    
+    <canvas id="canvas" width="1440" height="600"></canvas>
+
+    <script>
+        let terms = [];
+        let derivativeTerms = [];
+        let secondDerivativeTerms = [];
+        let additionalFunctions = [];
+        let verticalLines = [];
+        const colors = ['blue', 'red', 'black', 'green', 'orange', 'magenta', 'cyan'];
+        let colorIndex = 3;
+        
+        let view = {
+            cx: 0,
+            cy: 0,
+            zoomW: 20,
+            zoomH: 20,
+            get xMin() { return this.cx - this.zoomW/2 },
+            get xMax() { return this.cx + this.zoomW/2 },
+            get yMin() { return this.cy - this.zoomH/2 },
+            get yMax() { return this.cy + this.zoomH/2 }
+        };
+        
+        function Term(coefficient, exponent) {
+            return { coefficient, exponent };
+        }
+        
+        function parsePolynomial() {
+            const input = document.getElementById('polyInput').value.replace(/\s+/g, '');
+            terms = [];
+            derivativeTerms = [];
+            secondDerivativeTerms = [];
+            
+            const termStrs = input.split(/(?=[+-])/);
+            for (let termStr of termStrs) {
+                let term = parseTerm(termStr);
+                if (!term) {
+                    alert('Invalid polynomial format');
+                    return;
+                }
+                terms.push(term);
+            }
+            
+            derivativeTerms = computeDerivative(terms);
+            secondDerivativeTerms = computeDerivative(derivativeTerms);
+            
+            updateEquations();
+            redraw();
+        }
+        
+        function parseTerm(termStr) {
+            let sign = 1;
+            if (termStr.startsWith('-')) {
+                sign = -1;
+                termStr = termStr.substring(1);
+            } else if (termStr.startsWith('+')) {
+                termStr = termStr.substring(1);
+            }
+            
+            if (!termStr) return null;
+            
+            if (!termStr.includes('x')) {
+                return Term(sign * parseFloat(termStr), 0);
+            }
+            
+            let [coeffStr, expStr] = termStr.split('x');
+            if (!coeffStr) coeffStr = '1';
+            if (coeffStr === '-') coeffStr = '-1';
+            if (coeffStr === '+') coeffStr = '1';
+            
+            let coefficient = sign * parseFloat(coeffStr || 1);
+            let exponent = expStr ? parseInt(expStr.replace('^', '')) : 1;
+            
+            return Term(coefficient, exponent);
+        }
+        
+        function computeDerivative(terms) {
+            let derivativeMap = new Map();
+            for (let term of terms) {
+                if (term.exponent === 0) continue;
+                let newCoeff = term.coefficient * term.exponent;
+                let newExp = term.exponent - 1;
+                derivativeMap.set(newExp, (derivativeMap.get(newExp) || 0) + newCoeff);
+            }
+            return Array.from(derivativeMap.entries()).map(([exp, coeff]) => Term(coeff, exp));
+        }
+        
+        function buildEquation(terms) {
+            terms.sort((a, b) => b.exponent - a.exponent);
+            let parts = [];
+            for (let term of terms) {
+                if (term.coefficient === 0) continue;
+                let sign = term.coefficient > 0 ? '+' : '-';
+                let coeff = Math.abs(term.coefficient);
+                let part = '';
+                
+                if (term.exponent === 0) {
+                    part = `${sign}${coeff}`;
+                } else {
+                    part = `${sign}${coeff !== 1 ? coeff : ''}x`;
+                    if (term.exponent > 1) part += `^${term.exponent}`;
+                }
+                parts.push(part);
+            }
+            let equation = parts.join(' ');
+            return equation.startsWith('+') ? equation.substring(1) : equation;
+        }
+        
+        function updateEquations() {
+            const eqDiv = document.getElementById('equations');
+            eqDiv.innerHTML = `
+                <div>Original: ${buildEquation(terms)}</span>, First Derivative: <span style="color:blue">${buildEquation(derivativeTerms)}<span/>, <span style="color:black"> Second Derivative: <span style="color:red">${buildEquation(secondDerivativeTerms)}.</span></div>
+            `;
+        }
+        
+        function applyZoom() {
+            view.cx = parseFloat(document.getElementById('cx').value);
+            view.cy = parseFloat(document.getElementById('cy').value);
+            view.zoomW = parseFloat(document.getElementById('zoomW').value);
+            view.zoomH = parseFloat(document.getElementById('zoomH').value);
+            redraw();
+        }
+        
+        function addFunction() {
+            const input = prompt('Enter function (e.g., y=3x^2+2x-5, y=5, x=3):');
+            if (!input) return;
+            
+            const [left, right] = input.split('=').map(s => s.trim());
+            if (left.toLowerCase() === 'y') {
+                if (!isNaN(right)) {
+                    additionalFunctions.push({
+                        type: 'constant',
+                        value: parseFloat(right),
+                        color: colors[colorIndex % colors.length],
+                        eval: x => parseFloat(right)
+                    });
+                } else {
+                    const terms = parsePolynomial(right);
+                    if (terms) {
+                        additionalFunctions.push({
+                            type: 'function',
+                            terms,
+                            color: colors[colorIndex % colors.length],
+                            eval: x => terms.reduce((sum, t) => sum + t.coefficient * Math.pow(x, t.exponent), 0)
+                        });
+                    }
+                }
+                colorIndex++;
+            } else if (left.toLowerCase() === 'x') {
+                verticalLines.push({
+                    x: parseFloat(right),
+                    color: colors[colorIndex % colors.length]
+                });
+                colorIndex++;
+            }
+            redraw();
+        }
+        
+        function redraw() {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            drawGrid(ctx);
+            drawAxes(ctx);
+            drawFunctions(ctx);
+            drawVerticalLines(ctx);
+        }
+        
+        function drawGrid(ctx) {
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 0.5;
+            
+            for (let x = view.xMin; x <= view.xMax; x++) {
+                const px = ((x - view.xMin) / (view.xMax - view.xMin)) * canvas.width;
+                ctx.beginPath();
+                ctx.moveTo(px, 0);
+                ctx.lineTo(px, canvas.height);
+                ctx.stroke();
+            }
+            
+            for (let y = view.yMin; y <= view.yMax; y++) {
+                const py = ((view.yMax - y) / (view.yMax - view.yMin)) * canvas.height;
+                ctx.beginPath();
+                ctx.moveTo(0, py);
+                ctx.lineTo(canvas.width, py);
+                ctx.stroke();
+            }
+        }
+        
+        function drawAxes(ctx) {
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 1;
+            
+            // X-axis
+            if (view.yMin <= 0 && 0 <= view.yMax) {
+                const y = ((view.yMax - 0) / (view.yMax - view.yMin)) * canvas.height;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            // Y-axis
+            if (view.xMin <= 0 && 0 <= view.xMax) {
+                const x = ((0 - view.xMin) / (view.xMax - view.xMin)) * canvas.width;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+        }
+        
+        function drawFunctions(ctx) {
+            const allFunctions = [
+                { terms, color: 'black' },
+                { terms: derivativeTerms, color: 'blue' },
+                { terms: secondDerivativeTerms, color: 'red' },
+                ...additionalFunctions
+            ];
+            
+            allFunctions.forEach(func => {
+                ctx.strokeStyle = func.color;
+                ctx.beginPath();
+                
+                for (let x = view.xMin; x <= view.xMax; x += 0.1) {
+                    const y = func.eval ? func.eval(x) : 
+                        func.terms.reduce((sum, t) => sum + t.coefficient * Math.pow(x, t.exponent), 0);
+                    const px = ((x - view.xMin) / (view.xMax - view.xMin)) * canvas.width;
+                    const py = ((view.yMax - y) / (view.yMax - view.yMin)) * canvas.height;
+                    
+                    if (x === view.xMin) {
+                        ctx.moveTo(px, py);
+                    } else {
+                        ctx.lineTo(px, py);
+                    }
+                }
+                
+                ctx.stroke();
+            });
+        }
+        
+        function drawVerticalLines(ctx) {
+            verticalLines.forEach(line => {
+                ctx.strokeStyle = line.color;
+                const px = ((line.x - view.xMin) / (view.xMax - view.xMin)) * canvas.width;
+                ctx.beginPath();
+                ctx.moveTo(px, 0);
+                ctx.lineTo(px, canvas.height);
+                ctx.stroke();
+            });
+        }
+        
+        // Initialize with sample polynomial
+        parsePolynomial();
+        
+        // Add mouse move listener
+        canvas.addEventListener('mousemove', e => {
+            const rect = canvas.getBoundingClientRect();
+            const x = view.xMin + (e.clientX - rect.left) / canvas.width * (view.xMax - view.xMin);
+            const y = view.yMax - (e.clientY - rect.top) / canvas.height * (view.yMax - view.yMin);
+            
+            let text = `x: ${x.toFixed(2)}, y: ${y.toFixed(2)}`;
+            
+            const allFunctions = [
+                { terms, name: 'f(x)' },
+                { terms: derivativeTerms, name: "f'(x)" },
+                { terms: secondDerivativeTerms, name: "f''(x)" },
+                ...additionalFunctions
+            ];
+            
+            allFunctions.forEach(func => {
+                const yVal = func.eval ? func.eval(x) : 
+                    func.terms.reduce((sum, t) => sum + t.coefficient * Math.pow(x, t.exponent), 0);
+                text += `, ${func.name || 'func'}: ${yVal.toFixed(2)}`;
+            });
+            
+            document.getElementById('coordinates').textContent = text;
+        });
+    </script>
+</body>
+</html>
